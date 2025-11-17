@@ -1,0 +1,32 @@
+# .github/workflows/eoepca-aqbb-notebooks-testing.yml
+
+on: [push]
+
+jobs:
+  workflow-init:
+    name: Workflow initialisation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Retrieve pipeline details
+        env:
+          USERNAME: ${{ vars.EOEPCA_APPLICATION_QUALITY_USERNAME }}
+          PASSWORD: ${{ secrets.EOEPCA_APPLICATION_QUALITY_PASSWORD }}
+          PIPELINE_ID: ${{ vars.EOEPCA_APPLICATION_QUALITY_PIPELINE_ID_NOTEBOOKS_STATIC }}
+          URL: ${{ vars.EOEPCA_APPLICATION_QUALITY_API }}
+        run: |
+          echo $USERNAME
+          echo $PIPELINE_ID
+          echo $URL
+          # This script allows verifying that the inputs are valid: user credentials, pipeline ID, API URL
+          RES_JSON=`curl --json "{ \"username\": \"$USERNAME\", \"password\": \"$PASSWORD\" }" $URL/token/`
+          ACCESS_TOKEN=`echo $RES_JSON | jq -r '.access'`
+          REFRESH_TOKEN=`echo $RES_JSON | jq -r '.refresh'`
+          echo "Access token: $ACCESS_TOKEN"
+          echo "Refresh token: $REFRESH_TOKEN"
+          curl -H "Authorization: Bearer $ACCESS_TOKEN" $URL/pipelines/$PIPELINE_ID/
+  #notebooks-static-tests:
+  #  name: Notebooks static tests
+  #  needs: workflow-init
+  #notebooks-execution-tests:
+  #  name: Notebooks execution tests
+  #  needs: workflow-init
