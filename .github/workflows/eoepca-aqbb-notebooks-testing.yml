@@ -13,20 +13,66 @@ jobs:
           PASSWORD: ${{ secrets.EOEPCA_APPLICATION_QUALITY_PASSWORD }}
           PIPELINE_ID: ${{ vars.EOEPCA_APPLICATION_QUALITY_PIPELINE_ID_NOTEBOOKS_STATIC }}
           URL: ${{ vars.EOEPCA_APPLICATION_QUALITY_API }}
+          BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
         run: |
-          echo $USERNAME
-          echo $PIPELINE_ID
-          echo $URL
           # This script allows verifying that the inputs are valid: user credentials, pipeline ID, API URL
+          echo "User name: $USERNAME"
+          echo "Pipeline ID: $PIPELINE_ID"
+          echo "API URL: $URL"
+          echo "Branch name: $BRANCH_NAME"
+          
           RES_JSON=`curl --json "{ \"username\": \"$USERNAME\", \"password\": \"$PASSWORD\" }" $URL/token/`
+          # TODO: Fail if something goes wrong
           ACCESS_TOKEN=`echo $RES_JSON | jq -r '.access'`
           REFRESH_TOKEN=`echo $RES_JSON | jq -r '.refresh'`
           echo "Access token: $ACCESS_TOKEN"
           echo "Refresh token: $REFRESH_TOKEN"
+          
+          echo "Pipeline request URL $URL/pipelines/$PIPELINE_ID/"
           curl -H "Authorization: Bearer $ACCESS_TOKEN" $URL/pipelines/$PIPELINE_ID/
-  #notebooks-static-tests:
-  #  name: Notebooks static tests
-  #  needs: workflow-init
+          # TODO: Fail if something goes wrong
+  notebooks-static-tests:
+    name: Notebooks static tests
+    needs: workflow-init
+    runs-on: ubuntu-latest
+    steps:
+      - name: Retrieve pipeline details
+        env:
+          USERNAME: ${{ vars.EOEPCA_APPLICATION_QUALITY_USERNAME }}
+          PASSWORD: ${{ secrets.EOEPCA_APPLICATION_QUALITY_PASSWORD }}
+          PIPELINE_ID: ${{ vars.EOEPCA_APPLICATION_QUALITY_PIPELINE_ID_NOTEBOOKS_STATIC }}
+          API_URL: ${{ vars.EOEPCA_APPLICATION_QUALITY_API }}
+        run: |
+          echo "User name: $USERNAME"
+          echo "Pipeline ID: $PIPELINE_ID"
+          echo "API URL: $API_URL"
+
+          # Retrieve an access token
+          RES_JSON=`curl --json "{ \"username\": \"$USERNAME\", \"password\": \"$PASSWORD\" }" $URL/token/`
+          # TODO: Fail if something goes wrong
+          ACCESS_TOKEN=`echo $RES_JSON | jq -r '.access'`
+
+          REPO_URL="${{ github.server_url}}/${{ github.repository }}"
+          REPO_BRANCH="${{ github.head_ref || github.ref_name }}"
+          echo "Repo URL: $REPO_URL"
+          echo "Repo Branch: $REPO_BRANCH"
+          JSON_DATA=$(jq -n \
+            --arg repo_url "$REPO_URL" \
+            --arg repo_branch "$REPO_BRANCH" \
+            '{
+              "parameters": {
+                "clone_subworkflow": {
+                  "clone": {
+                    "repo_url": $repo_url,
+                    "repo_branch": $repo_branch
+                  }
+                }
+              }
+            }'
+          )
+          echo "Execution request payload: $JSON_DATA"
+          curl -H "Authorization: Bearer $ACCESS_TOKEN" --json "$JSON_DATA" $API_URL/pipelines/$PIPELINE_ID/runs/
+
   #notebooks-execution-tests:
   #  name: Notebooks execution tests
   #  needs: workflow-init
