@@ -12,24 +12,24 @@ jobs:
           USERNAME: ${{ vars.EOEPCA_APPLICATION_QUALITY_USERNAME }}
           PASSWORD: ${{ secrets.EOEPCA_APPLICATION_QUALITY_PASSWORD }}
           PIPELINE_ID: ${{ vars.EOEPCA_APPLICATION_QUALITY_PIPELINE_ID_NOTEBOOKS_STATIC }}
-          URL: ${{ vars.EOEPCA_APPLICATION_QUALITY_API }}
+          API_URL: ${{ vars.EOEPCA_APPLICATION_QUALITY_API }}
           BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
         run: |
           # This script allows verifying that the inputs are valid: user credentials, pipeline ID, API URL
           echo "User name: $USERNAME"
           echo "Pipeline ID: $PIPELINE_ID"
-          echo "API URL: $URL"
+          echo "API URL: $API_URL"
           echo "Branch name: $BRANCH_NAME"
           
-          RES_JSON=`curl --json "{ \"username\": \"$USERNAME\", \"password\": \"$PASSWORD\" }" $URL/token/`
+          RES_JSON=`curl --json "{ \"username\": \"$USERNAME\", \"password\": \"$PASSWORD\" }" $API_URL/token/`
           # TODO: Fail if something goes wrong
           ACCESS_TOKEN=`echo $RES_JSON | jq -r '.access'`
           REFRESH_TOKEN=`echo $RES_JSON | jq -r '.refresh'`
           echo "Access token: $ACCESS_TOKEN"
           echo "Refresh token: $REFRESH_TOKEN"
-          
-          echo "Pipeline request URL $URL/pipelines/$PIPELINE_ID/"
-          curl -H "Authorization: Bearer $ACCESS_TOKEN" $URL/pipelines/$PIPELINE_ID/
+
+          echo "Pipeline request URL $API_URL/pipelines/$PIPELINE_ID/"
+          curl -H "Authorization: Bearer $ACCESS_TOKEN" $API_URL/pipelines/$PIPELINE_ID/
           # TODO: Fail if something goes wrong
   notebooks-static-tests:
     name: Notebooks static tests
@@ -48,7 +48,7 @@ jobs:
           echo "API URL: $API_URL"
 
           # Retrieve an access token
-          RES_JSON=`curl --json "{ \"username\": \"$USERNAME\", \"password\": \"$PASSWORD\" }" $URL/token/`
+          RES_JSON=`curl --json "{ \"username\": \"$USERNAME\", \"password\": \"$PASSWORD\" }" $API_URL/token/`
           # TODO: Fail if something goes wrong
           ACCESS_TOKEN=`echo $RES_JSON | jq -r '.access'`
 
