@@ -3,7 +3,7 @@
 on: [push]
 
 jobs:
-  get_access_token:
+  init:
     name: Obtain an access token
     runs-on: ubuntu-latest
     outputs:
@@ -34,11 +34,10 @@ jobs:
         env:
           PIPELINE_ID: ${{ vars.EOEPCA_APPLICATION_QUALITY_PIPELINE_ID_NOTEBOOKS_STATIC }}
           API_URL: ${{ vars.EOEPCA_APPLICATION_QUALITY_API }}
-          ACCESS_TOKEN: ${{ steps.get_access_token.outputs.access_token }}
         run: |
           # This script retrieves the pipeline definition from the Application Quality service
           echo "Pipeline request URL $API_URL/pipelines/$PIPELINE_ID/"
-          RES_JSON=`curl -H "Authorization: Bearer $ACCESS_TOKEN" $API_URL/pipelines/$PIPELINE_ID/`
+          RES_JSON=`curl -H "Authorization: Bearer ${{ steps.get_access_token.outputs.access_token }}" $API_URL/pipelines/$PIPELINE_ID/`
           PIPELINE_ID2=`echo $RES_JSON | jq -r '.id'`
           PIPELINE_NAME=`echo $RES_JSON | jq -r '.name'`
           echo "Pipeline ID: $PIPELINE_ID2"
@@ -50,7 +49,7 @@ jobs:
 
   notebooks-static-tests:
     name: Notebooks static tests
-    needs: get_access_token
+    needs: init
     runs-on: ubuntu-latest
     steps:
       - name: Trigger pipeline execution
@@ -58,7 +57,6 @@ jobs:
         env:
           PIPELINE_ID: ${{ vars.EOEPCA_APPLICATION_QUALITY_PIPELINE_ID_NOTEBOOKS_STATIC }}
           API_URL: ${{ vars.EOEPCA_APPLICATION_QUALITY_API }}
-          ACCESS_TOKEN: ${{ needs.get_access_token.outputs.access_token }}
         run: |
           # Prepare the parameters then execute the pipeline
           echo "Pipeline ID: $PIPELINE_ID"
@@ -85,7 +83,7 @@ jobs:
           )
           echo "Execution request payload: $JSON_DATA"
 
-          RES_JSON=`curl -H "Authorization: Bearer $ACCESS_TOKEN" --json "$JSON_DATA" $API_URL/pipelines/$PIPELINE_ID/runs/`
+          RES_JSON=`curl -H "Authorization: Bearer ${{ needs.init.outputs.access_token }}" --json "$JSON_DATA" $API_URL/pipelines/$PIPELINE_ID/runs/`
           RUN_ID=`echo $RES_JSON | jq -r '.id'`
           START_TIME=`echo $RES_JSON | jq -r '.start_time'`
           echo "Pipeline run ID: $RUN_ID"
@@ -97,7 +95,7 @@ jobs:
 
   notebooks-execution-tests:
     name: Notebooks execution tests
-    needs: get_access_token
+    needs: init
     runs-on: ubuntu-latest
     steps:
       - name: Trigger pipeline execution
@@ -105,7 +103,6 @@ jobs:
         env:
           PIPELINE_ID: ${{ vars.EOEPCA_APPLICATION_QUALITY_PIPELINE_ID_NOTEBOOKS_EXEC }}
           API_URL: ${{ vars.EOEPCA_APPLICATION_QUALITY_API }}
-          ACCESS_TOKEN: ${{ needs.get_access_token.outputs.access_token }}
         run: |
           # Prepare the parameters then execute the pipeline
           echo "Pipeline ID: $PIPELINE_ID"
@@ -132,7 +129,7 @@ jobs:
           )
           echo "Execution request payload: $JSON_DATA"
 
-          RES_JSON=`curl -H "Authorization: Bearer $ACCESS_TOKEN" --json "$JSON_DATA" $API_URL/pipelines/$PIPELINE_ID/runs/`
+          RES_JSON=`curl -H "Authorization: Bearer ${{ needs.init.outputs.access_token }}" --json "$JSON_DATA" $API_URL/pipelines/$PIPELINE_ID/runs/`
           RUN_ID=`echo $RES_JSON | jq -r '.id'`
           START_TIME=`echo $RES_JSON | jq -r '.start_time'`
           echo "Pipeline run ID: $RUN_ID"
