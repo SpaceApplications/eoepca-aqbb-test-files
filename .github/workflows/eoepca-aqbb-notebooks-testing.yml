@@ -7,16 +7,15 @@ jobs:
     name: Workflow initialisation
     runs-on: ubuntu-latest
     steps:
-      - name: Retrieve pipeline details
+      - name: Obtain an access token
+        id: get_access_token
         env:
           USERNAME: ${{ vars.EOEPCA_APPLICATION_QUALITY_USERNAME }}
           PASSWORD: ${{ secrets.EOEPCA_APPLICATION_QUALITY_PASSWORD }}
-          PIPELINE_ID: ${{ vars.EOEPCA_APPLICATION_QUALITY_PIPELINE_ID_NOTEBOOKS_STATIC }}
           API_URL: ${{ vars.EOEPCA_APPLICATION_QUALITY_API }}
         run: |
-          # This script allows verifying that the inputs are valid: user credentials, pipeline ID, API URL
+          # This script obtains a JWT access token using the user credentials
           echo "User name: $USERNAME"
-          echo "Pipeline ID: $PIPELINE_ID"
           echo "API URL: $API_URL"
           
           # Retrieve an access token
@@ -26,7 +25,16 @@ jobs:
             echo "Could not obtain an access token: $RES_JSON"
             exit 1
           fi
+          echo "access_token=$ACCESS_TOKEN" >> $GITHUB_OUTPUT
 
+      - name: Retrieve pipeline details
+        id: get_pipeline_details
+        env:
+          PIPELINE_ID: ${{ vars.EOEPCA_APPLICATION_QUALITY_PIPELINE_ID_NOTEBOOKS_STATIC }}
+          API_URL: ${{ vars.EOEPCA_APPLICATION_QUALITY_API }}
+          ACCESS_TOKEN: ${{ steps.get_access_token.outputs.access_token }}
+        run: |
+          # This script retrieves the pipeline definition from the Application Quality service
           echo "Pipeline request URL $API_URL/pipelines/$PIPELINE_ID/"
           RES_JSON=`curl -H "Authorization: Bearer $ACCESS_TOKEN" $API_URL/pipelines/$PIPELINE_ID/`
           PIPELINE_ID2=`echo $RES_JSON | jq -r '.id'`
