@@ -27,7 +27,7 @@ jobs:
             echo "Could not obtain an access token: $RES_JSON"
             exit 1
           fi
-          ACCESS_TOKEN_B64=`echo $ACCESS_TOKEN | base64`
+          ACCESS_TOKEN_B64=`echo $ACCESS_TOKEN | base64 -w 0`
           echo "access_token_b64=$ACCESS_TOKEN_B64" >> $GITHUB_OUTPUT
 
       - name: Retrieve pipeline details
