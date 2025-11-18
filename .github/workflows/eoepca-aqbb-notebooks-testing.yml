@@ -51,17 +51,17 @@ jobs:
     needs: workflow-init
     runs-on: ubuntu-latest
     steps:
-      - name: Static analysis
+      - name: Obtain an access token
+        id: get_access_token
         env:
           USERNAME: ${{ vars.EOEPCA_APPLICATION_QUALITY_USERNAME }}
           PASSWORD: ${{ secrets.EOEPCA_APPLICATION_QUALITY_PASSWORD }}
-          PIPELINE_ID: ${{ vars.EOEPCA_APPLICATION_QUALITY_PIPELINE_ID_NOTEBOOKS_STATIC }}
           API_URL: ${{ vars.EOEPCA_APPLICATION_QUALITY_API }}
         run: |
+          # This script obtains a JWT access token using the user credentials
           echo "User name: $USERNAME"
-          echo "Pipeline ID: $PIPELINE_ID"
           echo "API URL: $API_URL"
-
+          
           # Retrieve an access token
           RES_JSON=`curl --json "{ \"username\": \"$USERNAME\", \"password\": \"$PASSWORD\" }" $API_URL/token/`
           ACCESS_TOKEN=`echo $RES_JSON | jq -r '.access'`
@@ -69,11 +69,24 @@ jobs:
             echo "Could not obtain an access token: $RES_JSON"
             exit 1
           fi
+          echo "access_token=$ACCESS_TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Execute pipeline
+        id: execute_pipeline
+        env:
+          PIPELINE_ID: ${{ vars.EOEPCA_APPLICATION_QUALITY_PIPELINE_ID_NOTEBOOKS_STATIC }}
+          API_URL: ${{ vars.EOEPCA_APPLICATION_QUALITY_API }}
+          ACCESS_TOKEN: ${{ steps.get_access_token.outputs.access_token }}
+        run: |
+          # Prepare the parameters then execute the pipeline
+          echo "Pipeline ID: $PIPELINE_ID"
+          echo "API URL: $API_URL"
 
           REPO_URL="${{ github.server_url}}/${{ github.repository }}"
           REPO_BRANCH="${{ github.head_ref || github.ref_name }}"
           echo "Repo URL: $REPO_URL"
           echo "Repo Branch: $REPO_BRANCH"
+
           JSON_DATA=$(jq -n \
             --arg repo_url "$REPO_URL" \
             --arg repo_branch "$REPO_BRANCH" \
@@ -89,6 +102,7 @@ jobs:
             }'
           )
           echo "Execution request payload: $JSON_DATA"
+
           RES_JSON=`curl -H "Authorization: Bearer $ACCESS_TOKEN" --json "$JSON_DATA" $API_URL/pipelines/$PIPELINE_ID/runs/`
           RUN_ID=`echo $RES_JSON | jq -r '.id'`
           START_TIME=`echo $RES_JSON | jq -r '.start_time'`
@@ -104,17 +118,17 @@ jobs:
     needs: workflow-init
     runs-on: ubuntu-latest
     steps:
-      - name: Notebooks execution
+      - name: Obtain an access token
+        id: get_access_token
         env:
           USERNAME: ${{ vars.EOEPCA_APPLICATION_QUALITY_USERNAME }}
           PASSWORD: ${{ secrets.EOEPCA_APPLICATION_QUALITY_PASSWORD }}
-          PIPELINE_ID: ${{ vars.EOEPCA_APPLICATION_QUALITY_PIPELINE_ID_NOTEBOOKS_EXEC }}
           API_URL: ${{ vars.EOEPCA_APPLICATION_QUALITY_API }}
         run: |
+          # This script obtains a JWT access token using the user credentials
           echo "User name: $USERNAME"
-          echo "Pipeline ID: $PIPELINE_ID"
           echo "API URL: $API_URL"
-
+          
           # Retrieve an access token
           RES_JSON=`curl --json "{ \"username\": \"$USERNAME\", \"password\": \"$PASSWORD\" }" $API_URL/token/`
           ACCESS_TOKEN=`echo $RES_JSON | jq -r '.access'`
@@ -122,11 +136,24 @@ jobs:
             echo "Could not obtain an access token: $RES_JSON"
             exit 1
           fi
+          echo "access_token=$ACCESS_TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Execute pipeline
+        id: execute_pipeline
+        env:
+          PIPELINE_ID: ${{ vars.EOEPCA_APPLICATION_QUALITY_PIPELINE_ID_NOTEBOOKS_EXEC }}
+          API_URL: ${{ vars.EOEPCA_APPLICATION_QUALITY_API }}
+          ACCESS_TOKEN: ${{ steps.get_access_token.outputs.access_token }}
+        run: |
+          # Prepare the parameters then execute the pipeline
+          echo "Pipeline ID: $PIPELINE_ID"
+          echo "API URL: $API_URL"
 
           REPO_URL="${{ github.server_url}}/${{ github.repository }}"
           REPO_BRANCH="${{ github.head_ref || github.ref_name }}"
           echo "Repo URL: $REPO_URL"
           echo "Repo Branch: $REPO_BRANCH"
+
           JSON_DATA=$(jq -n \
             --arg repo_url "$REPO_URL" \
             --arg repo_branch "$REPO_BRANCH" \
@@ -142,6 +169,7 @@ jobs:
             }'
           )
           echo "Execution request payload: $JSON_DATA"
+
           RES_JSON=`curl -H "Authorization: Bearer $ACCESS_TOKEN" --json "$JSON_DATA" $API_URL/pipelines/$PIPELINE_ID/runs/`
           RUN_ID=`echo $RES_JSON | jq -r '.id'`
           START_TIME=`echo $RES_JSON | jq -r '.start_time'`
