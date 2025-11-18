@@ -91,6 +91,55 @@ jobs:
             exit 3
           fi
 
-  #notebooks-execution-tests:
-  #  name: Notebooks execution tests
-  #  needs: workflow-init
+  notebooks-execution-tests:
+    name: Notebooks execution tests
+    needs: workflow-init
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notebooks execution
+        env:
+          USERNAME: ${{ vars.EOEPCA_APPLICATION_QUALITY_USERNAME }}
+          PASSWORD: ${{ secrets.EOEPCA_APPLICATION_QUALITY_PASSWORD }}
+          PIPELINE_ID: ${{ vars.EOEPCA_APPLICATION_QUALITY_PIPELINE_ID_NOTEBOOKS_EXEC }}
+          API_URL: ${{ vars.EOEPCA_APPLICATION_QUALITY_API }}
+        run: |
+          echo "User name: $USERNAME"
+          echo "Pipeline ID: $PIPELINE_ID"
+          echo "API URL: $API_URL"
+
+          # Retrieve an access token
+          RES_JSON=`curl --json "{ \"username\": \"$USERNAME\", \"password\": \"$PASSWORD\" }" $API_URL/token/`
+          ACCESS_TOKEN=`echo $RES_JSON | jq -r '.access'`
+          if [ "$ACCESS_TOKEN" = "null" ]; then
+            echo "Could not obtain an access token: $RES_JSON"
+            exit 1
+          fi
+
+          REPO_URL="${{ github.server_url}}/${{ github.repository }}"
+          REPO_BRANCH="${{ github.head_ref || github.ref_name }}"
+          echo "Repo URL: $REPO_URL"
+          echo "Repo Branch: $REPO_BRANCH"
+          JSON_DATA=$(jq -n \
+            --arg repo_url "$REPO_URL" \
+            --arg repo_branch "$REPO_BRANCH" \
+            '{
+              "parameters": {
+                "clone_subworkflow": {
+                  "clone": {
+                    "repo_url": $repo_url,
+                    "repo_branch": $repo_branch
+                  }
+                }
+              }
+            }'
+          )
+          echo "Execution request payload: $JSON_DATA"
+          RES_JSON=`curl -H "Authorization: Bearer $ACCESS_TOKEN" --json "$JSON_DATA" $API_URL/pipelines/$PIPELINE_ID/runs/`
+          RUN_ID=`echo $RES_JSON | jq -r '.id'`
+          START_TIME=`echo $RES_JSON | jq -r '.start_time'`
+          echo "Pipeline run ID: $RUN_ID"
+          echo "Start time: $START_TIME"
+          if [ "$RUN_ID" = "null" ]; then
+            echo "Could not execute the pipeline: $RES_JSON"
+            exit 3
+          fi
