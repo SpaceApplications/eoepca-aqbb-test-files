@@ -4,15 +4,10 @@ on: [push]
 
 jobs:
   init:
-    name: Update access token
+    name: Obtain an access token
     runs-on: ubuntu-latest
-    # https://docs.github.com/en/actions/tutorials/authenticate-with-github_token#modifying-the-permissions-for-the-github_token
-    #permissions:
-    #  contents: read
-    #  # Required to update secrets => No, there is no such "secrets" key 
-    #  secrets: write
     outputs:
-      access_token: ${{ steps.get_access_token.outputs.access_token }}
+      access_token_b64: ${{ steps.get_access_token.outputs.access_token_b64 }}
     steps:
       - name: Obtain an access token
         id: get_access_token
@@ -32,18 +27,8 @@ jobs:
             echo "Could not obtain an access token: $RES_JSON"
             exit 1
           fi
-          echo "::add-mask::$ACCESS_TOKEN"
-          echo "access_token=$ACCESS_TOKEN" >> $GITHUB_OUTPUT
-      
-      - name: Update the access token secret
-        id: update_access_token_secret
-        # https://github.com/marketplace/actions/set-action-secret
-        uses: hmanzur/actions-set-secret@v2.0.0
-        with:
-          name: EOEPCA_APPLICATION_QUALITY_ACCESS_TOKEN
-          value: ${{ steps.get_access_token.outputs.access_token }}
-          repository: ${{ github.repository }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+          ACCESS_TOKEN_B64=`echo $ACCESS_TOKEN | base64`
+          echo "access_token_b64=$ACCESS_TOKEN_B64" >> $GITHUB_OUTPUT
 
       - name: Retrieve pipeline details
         id: get_pipeline_details
@@ -53,7 +38,8 @@ jobs:
         run: |
           # This script retrieves the pipeline definition from the Application Quality service
           echo "Pipeline request URL $API_URL/pipelines/$PIPELINE_ID/"
-          RES_JSON=`curl -H "Authorization: Bearer ${{ steps.get_access_token.outputs.access_token }}" $API_URL/pipelines/$PIPELINE_ID/`
+          ACCESS_TOKEN=`echo ${{ steps.get_access_token.outputs.access_token_b64 }} | base64 -d`
+          RES_JSON=`curl -H "Authorization: Bearer $ACCESS_TOKEN" $API_URL/pipelines/$PIPELINE_ID/`
           PIPELINE_ID2=`echo $RES_JSON | jq -r '.id'`
           PIPELINE_NAME=`echo $RES_JSON | jq -r '.name'`
           echo "Pipeline ID: $PIPELINE_ID2"
@@ -73,7 +59,6 @@ jobs:
         env:
           PIPELINE_ID: ${{ vars.EOEPCA_APPLICATION_QUALITY_PIPELINE_ID_NOTEBOOKS_STATIC }}
           API_URL: ${{ vars.EOEPCA_APPLICATION_QUALITY_API }}
-          ACCESS_TOKEN: ${{ secrets.EOEPCA_APPLICATION_QUALITY_ACCESS_TOKEN }}
         run: |
           # Prepare the parameters then execute the pipeline
           echo "Pipeline ID: $PIPELINE_ID"
@@ -100,8 +85,8 @@ jobs:
           )
           echo "Execution request payload: $JSON_DATA"
 
-          RUNS_URL="$API_URL/pipelines/$PIPELINE_ID/runs/"
-          RES_JSON=`curl -H "Authorization: Bearer $ACCESS_TOKEN" --json "$JSON_DATA" $RUNS_URL`
+          ACCESS_TOKEN=`echo ${{ needs.init.outputs.access_token_b64 }} | base64 -d`
+          RES_JSON=`curl -H "Authorization: Bearer $ACCESS_TOKEN" --json "$JSON_DATA" $API_URL/pipelines/$PIPELINE_ID/runs/`
           RUN_ID=`echo $RES_JSON | jq -r '.id'`
           START_TIME=`echo $RES_JSON | jq -r '.start_time'`
           echo "Pipeline run ID: $RUN_ID"
@@ -121,7 +106,6 @@ jobs:
         env:
           PIPELINE_ID: ${{ vars.EOEPCA_APPLICATION_QUALITY_PIPELINE_ID_NOTEBOOKS_EXEC }}
           API_URL: ${{ vars.EOEPCA_APPLICATION_QUALITY_API }}
-          ACCESS_TOKEN: ${{ secrets.EOEPCA_APPLICATION_QUALITY_ACCESS_TOKEN }}
         run: |
           # Prepare the parameters then execute the pipeline
           echo "Pipeline ID: $PIPELINE_ID"
@@ -148,8 +132,8 @@ jobs:
           )
           echo "Execution request payload: $JSON_DATA"
 
-          RUNS_URL="$API_URL/pipelines/$PIPELINE_ID/runs/"
-          RES_JSON=`curl -H "Authorization: Bearer $ACCESS_TOKEN" --json "$JSON_DATA" $RUNS_URL`
+          ACCESS_TOKEN=`echo ${{ needs.init.outputs.access_token_b64 }} | base64 -d`
+          RES_JSON=`curl -H "Authorization: Bearer $ACCESS_TOKEN" --json "$JSON_DATA" $API_URL/pipelines/$PIPELINE_ID/runs/`
           RUN_ID=`echo $RES_JSON | jq -r '.id'`
           START_TIME=`echo $RES_JSON | jq -r '.start_time'`
           echo "Pipeline run ID: $RUN_ID"
