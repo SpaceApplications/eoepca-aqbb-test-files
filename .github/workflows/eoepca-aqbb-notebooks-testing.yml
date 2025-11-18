@@ -4,8 +4,11 @@ on: [push]
 
 jobs:
   init:
-    name: Obtain an access token
+    name: Update access token
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      secrets: write # Required to update secrets
     outputs:
       access_token: ${{ steps.get_access_token.outputs.access_token }}
     steps:
@@ -27,7 +30,16 @@ jobs:
             echo "Could not obtain an access token: $RES_JSON"
             exit 1
           fi
+          echo "::add-mask::$ACCESS_TOKEN"
           echo "access_token=$ACCESS_TOKEN" >> $GITHUB_OUTPUT
+      
+      - name: Update the access token secret
+        id: update_access_token_secret
+        uses: hmanzur/actions-secret-update@v1.0.0
+        with:
+          secret_name: EOEPCA_APPLICATION_QUALITY_ACCESS_TOKEN
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          secret_value: ${{ steps.get_access_token.outputs.access_token }}
 
       - name: Retrieve pipeline details
         id: get_pipeline_details
@@ -57,6 +69,7 @@ jobs:
         env:
           PIPELINE_ID: ${{ vars.EOEPCA_APPLICATION_QUALITY_PIPELINE_ID_NOTEBOOKS_STATIC }}
           API_URL: ${{ vars.EOEPCA_APPLICATION_QUALITY_API }}
+          ACCESS_TOKEN: ${{ secrets.EOEPCA_APPLICATION_QUALITY_ACCESS_TOKEN }}
         run: |
           # Prepare the parameters then execute the pipeline
           echo "Pipeline ID: $PIPELINE_ID"
@@ -83,7 +96,8 @@ jobs:
           )
           echo "Execution request payload: $JSON_DATA"
 
-          RES_JSON=`curl -H "Authorization: Bearer ${{ needs.init.outputs.access_token }}" --json "$JSON_DATA" $API_URL/pipelines/$PIPELINE_ID/runs/`
+          RUNS_URL="$API_URL/pipelines/$PIPELINE_ID/runs/"
+          RES_JSON=`curl -H "Authorization: Bearer $ACCESS_TOKEN" --json "$JSON_DATA" $RUNS_URL`
           RUN_ID=`echo $RES_JSON | jq -r '.id'`
           START_TIME=`echo $RES_JSON | jq -r '.start_time'`
           echo "Pipeline run ID: $RUN_ID"
@@ -103,6 +117,7 @@ jobs:
         env:
           PIPELINE_ID: ${{ vars.EOEPCA_APPLICATION_QUALITY_PIPELINE_ID_NOTEBOOKS_EXEC }}
           API_URL: ${{ vars.EOEPCA_APPLICATION_QUALITY_API }}
+          ACCESS_TOKEN: ${{ secrets.EOEPCA_APPLICATION_QUALITY_ACCESS_TOKEN }}
         run: |
           # Prepare the parameters then execute the pipeline
           echo "Pipeline ID: $PIPELINE_ID"
@@ -129,7 +144,8 @@ jobs:
           )
           echo "Execution request payload: $JSON_DATA"
 
-          RES_JSON=`curl -H "Authorization: Bearer ${{ needs.init.outputs.access_token }}" --json "$JSON_DATA" $API_URL/pipelines/$PIPELINE_ID/runs/`
+          RUNS_URL="$API_URL/pipelines/$PIPELINE_ID/runs/"
+          RES_JSON=`curl -H "Authorization: Bearer $ACCESS_TOKEN" --json "$JSON_DATA" $RUNS_URL`
           RUN_ID=`echo $RES_JSON | jq -r '.id'`
           START_TIME=`echo $RES_JSON | jq -r '.start_time'`
           echo "Pipeline run ID: $RUN_ID"
