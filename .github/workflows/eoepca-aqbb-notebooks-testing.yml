@@ -3,9 +3,11 @@
 on: [push]
 
 jobs:
-  workflow-init:
-    name: Workflow initialisation
+  get_access_token:
+    name: Obtain an access token
     runs-on: ubuntu-latest
+    outputs:
+      access_token: ${{ steps.get_access_token.outputs.access_token }}
     steps:
       - name: Obtain an access token
         id: get_access_token
@@ -48,35 +50,15 @@ jobs:
 
   notebooks-static-tests:
     name: Notebooks static tests
-    needs: workflow-init
+    needs: get_access_token
     runs-on: ubuntu-latest
     steps:
-      - name: Obtain an access token
-        id: get_access_token
-        env:
-          USERNAME: ${{ vars.EOEPCA_APPLICATION_QUALITY_USERNAME }}
-          PASSWORD: ${{ secrets.EOEPCA_APPLICATION_QUALITY_PASSWORD }}
-          API_URL: ${{ vars.EOEPCA_APPLICATION_QUALITY_API }}
-        run: |
-          # This script obtains a JWT access token using the user credentials
-          echo "User name: $USERNAME"
-          echo "API URL: $API_URL"
-          
-          # Retrieve an access token
-          RES_JSON=`curl --json "{ \"username\": \"$USERNAME\", \"password\": \"$PASSWORD\" }" $API_URL/token/`
-          ACCESS_TOKEN=`echo $RES_JSON | jq -r '.access'`
-          if [ "$ACCESS_TOKEN" = "null" ]; then
-            echo "Could not obtain an access token: $RES_JSON"
-            exit 1
-          fi
-          echo "access_token=$ACCESS_TOKEN" >> $GITHUB_OUTPUT
-
-      - name: Execute pipeline
+      - name: Trigger pipeline execution
         id: execute_pipeline
         env:
           PIPELINE_ID: ${{ vars.EOEPCA_APPLICATION_QUALITY_PIPELINE_ID_NOTEBOOKS_STATIC }}
           API_URL: ${{ vars.EOEPCA_APPLICATION_QUALITY_API }}
-          ACCESS_TOKEN: ${{ steps.get_access_token.outputs.access_token }}
+          ACCESS_TOKEN: ${{ needs.get_access_token.outputs.access_token }}
         run: |
           # Prepare the parameters then execute the pipeline
           echo "Pipeline ID: $PIPELINE_ID"
@@ -115,35 +97,15 @@ jobs:
 
   notebooks-execution-tests:
     name: Notebooks execution tests
-    needs: workflow-init
+    needs: get_access_token
     runs-on: ubuntu-latest
     steps:
-      - name: Obtain an access token
-        id: get_access_token
-        env:
-          USERNAME: ${{ vars.EOEPCA_APPLICATION_QUALITY_USERNAME }}
-          PASSWORD: ${{ secrets.EOEPCA_APPLICATION_QUALITY_PASSWORD }}
-          API_URL: ${{ vars.EOEPCA_APPLICATION_QUALITY_API }}
-        run: |
-          # This script obtains a JWT access token using the user credentials
-          echo "User name: $USERNAME"
-          echo "API URL: $API_URL"
-          
-          # Retrieve an access token
-          RES_JSON=`curl --json "{ \"username\": \"$USERNAME\", \"password\": \"$PASSWORD\" }" $API_URL/token/`
-          ACCESS_TOKEN=`echo $RES_JSON | jq -r '.access'`
-          if [ "$ACCESS_TOKEN" = "null" ]; then
-            echo "Could not obtain an access token: $RES_JSON"
-            exit 1
-          fi
-          echo "access_token=$ACCESS_TOKEN" >> $GITHUB_OUTPUT
-
-      - name: Execute pipeline
+      - name: Trigger pipeline execution
         id: execute_pipeline
         env:
           PIPELINE_ID: ${{ vars.EOEPCA_APPLICATION_QUALITY_PIPELINE_ID_NOTEBOOKS_EXEC }}
           API_URL: ${{ vars.EOEPCA_APPLICATION_QUALITY_API }}
-          ACCESS_TOKEN: ${{ steps.get_access_token.outputs.access_token }}
+          ACCESS_TOKEN: ${{ needs.get_access_token.outputs.access_token }}
         run: |
           # Prepare the parameters then execute the pipeline
           echo "Pipeline ID: $PIPELINE_ID"
