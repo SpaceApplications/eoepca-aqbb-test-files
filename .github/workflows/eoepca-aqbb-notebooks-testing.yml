@@ -1,6 +1,8 @@
 # .github/workflows/eoepca-aqbb-notebooks-testing.yml
 
-on: [push]
+on:
+  push:
+  workflow_dispatch:
 
 jobs:
   init:
