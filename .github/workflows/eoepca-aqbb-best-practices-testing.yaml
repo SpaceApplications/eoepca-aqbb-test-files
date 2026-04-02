@@ -1,0 +1,70 @@
+# .github/workflows/eoepca-aqbb-best-practices-testing.yml
+
+name: Best Practices Adherence
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  analyze-and-report:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Clone the repository
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Important for SonarQube to calculate "New Code"
+
+      # Step 2: Apply Ruff and store report
+      - name: Install Ruff
+        run: pip install ruff
+
+      - name: Run Ruff Linting
+        run: |
+          mkdir -p reports
+          ruff check . --format json --output-file reports/ruff-report.json
+        continue-on-error: true # The workflow continues even if linting finds issues
+
+      # Step 3: Run SonarQube Analysis
+      - name: SonarQube Scan
+        uses: sonarsource/sonarqube-scan-action@master
+        env:
+          SONAR_TOKEN: ${{ secrets.EOEPCA_SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ vars.EOEPCA_SONAR_HOST_URL }}
+        with:
+          args: >
+            -Dsonar.projectKey=${{ vars.EOEPCA_SONAR_PROJECT_KEY }}
+            -Dsonar.projectName=${{ vars.EOEPCA_SONAR_PROJECT_NAME }}
+            -Dsonar.python.ruff.reportPaths=reports/ruff-report.json
+            -Dsonar.sources=.
+
+      # Step 4: Wait for Quality Gate and Fetch Report
+      - name: Fetch SonarQube Quality Gate Result
+        run: |
+          # The scan action creates a metadata file we use to find the task URL
+          METADATA_FILE=".scannerwork/report-task.txt"
+          TASK_URL=$(grep "ceTaskUrl=" $METADATA_FILE | cut -d'=' -f2)
+
+          echo "Waiting for SonarQube background task to finish..."
+
+          # Poll the API until the task is SUCCESS or FAILED
+          STATUS="PENDING"
+          while [ "$STATUS" == "PENDING" ] || [ "$STATUS" == "IN_PROGRESS" ]; do
+            sleep 5
+            RESPONSE=$(curl -s -u ${{ secrets.EOEPCA_SONAR_TOKEN }}: "$TASK_URL")
+            STATUS=$(echo $RESPONSE | jq -r '.task.status')
+            echo "Current Status: $STATUS"
+          done
+
+          # Fetch the final status of the Quality Gate
+          ANALYSIS_ID=$(echo $RESPONSE | jq -r '.task.analysisId')
+          GATE_URL="${{ vars.EOEPCA_SONAR_HOST_URL }}/api/qualitygates/project_status?analysisId=$ANALYSIS_ID"
+
+          curl -s -u ${{ secrets.EOEPCA_SONAR_TOKEN }}: "$GATE_URL" > reports/sonarqube-gate-report.json
+
+          echo "Final report saved to reports/sonarqube-gate-report.json"
+        shell: bash
