@@ -38,7 +38,7 @@ jobs:
         with:
           args: >
             -Dsonar.projectKey=${{ vars.EOEPCA_SONAR_PROJECT_KEY }}
-            -Dsonar.projectName="${{ vars.EOEPCA_SONAR_PROJECT_NAME }}"
+            -Dsonar.projectName='${{ vars.EOEPCA_SONAR_PROJECT_NAME }}'
             -Dsonar.python.ruff.reportPaths=reports/ruff-report.json
             -Dsonar.sources=.
 
