@@ -30,18 +30,14 @@ jobs:
           cat reports/ruff-report.json
         continue-on-error: true # The workflow continues even if linting finds issues
 
-      # Step 3: Run SonarQube Analysis
-      - name: SonarQube Scan
-        uses: sonarsource/sonarqube-scan-action@master
-        env:
-          SONAR_TOKEN: ${{ secrets.EOEPCA_SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ vars.EOEPCA_SONAR_HOST_URL }}
+      # Step 3: Generate the SonarQube project properties
+      - name: SonarQube Project properties
         run: |
           echo "Generating the Sonar project properties file ..."
           echo "sonar.projectKey=${{ vars.EOEPCA_SONAR_PROJECT_KEY }}" > sonar-project.properties
           echo "sonar.projectName=${{ vars.EOEPCA_SONAR_PROJECT_NAME }}" >> sonar-project.properties
-          echo "#sonar.projectVersion=${{ vars.EOEPCA_SONAR_PROJECT_VERSION }}" >> sonar-project.properties
-          echo "#sonar.sourceEncoding=UTF-8" >> sonar-project.properties
+          echo "sonar.projectVersion=$GITHUB_SHA" >> sonar-project.properties
+          echo "sonar.sourceEncoding=UTF-8" >> sonar-project.properties
           echo "sonar.projectBaseDir=." >> sonar-project.properties
           echo "sonar.sources=." >> sonar-project.properties
           echo "sonar.inclusions=**/*.py,**/*.js,**/*.jsx,**/*.mjs" >> sonar-project.properties
@@ -55,10 +51,14 @@ jobs:
           echo "Sonar project properties:"
           cat sonar-project.properties
 
-          echo "Starting the SonarQube scanner ..."
-          sonar-scanner
+      # Step 4: Run SonarQube Analysis (using the properties file generated above)
+      - name: SonarQube Scan
+        uses: sonarsource/sonarqube-scan-action@master
+        env:
+          SONAR_TOKEN: ${{ secrets.EOEPCA_SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ vars.EOEPCA_SONAR_HOST_URL }}
 
-      # Step 4: Wait for Quality Gate and Fetch Report
+      # Step 5: Wait for Quality Gate and Fetch Report
       - name: Fetch SonarQube Quality Gate Result
         run: |
           # The scan action creates a metadata file we use to find the task URL
