@@ -26,7 +26,7 @@ jobs:
       - name: Run Ruff Linting
         run: |
           mkdir -p reports
-          ruff check . --format json --output-file reports/ruff-report.json
+          ruff check . --no-cache --explain --verbose --output-format json --output-file reports/ruff-report.json
         continue-on-error: true # The workflow continues even if linting finds issues
 
       # Step 3: Run SonarQube Analysis
@@ -37,8 +37,8 @@ jobs:
           SONAR_HOST_URL: ${{ vars.EOEPCA_SONAR_HOST_URL }}
         with:
           args: >
-            -Dsonar.projectKey=${{ vars.EOEPCA_SONAR_PROJECT_KEY }}
-            -Dsonar.projectName=${{ vars.EOEPCA_SONAR_PROJECT_NAME }}
+            -Dsonar.projectKey="${{ vars.EOEPCA_SONAR_PROJECT_KEY }}"
+            -Dsonar.projectName="${{ vars.EOEPCA_SONAR_PROJECT_NAME }}"
             -Dsonar.python.ruff.reportPaths=reports/ruff-report.json
             -Dsonar.sources=.
 
