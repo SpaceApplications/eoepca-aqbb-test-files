@@ -1,4 +1,4 @@
-# .github/workflows/eoepca-aqbb-best-practices-testing.yml
+# This workflow is triggered by pushes on the "main" branch.
 
 name: Best Practices Adherence
 
@@ -13,13 +13,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Clone the repository
+      # Clone the repository
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
-          fetch-depth: 0 # Important for SonarQube to calculate "New Code"
+          fetch-depth: 0 # Helps SonarQube to identify the "New Code"
 
-      # Step 2: Apply Ruff and store report
+      # Apply Ruff and store report
       - name: Install Ruff
         run: pip install ruff
 
@@ -30,8 +30,20 @@ jobs:
           cat reports/ruff-report.json
         continue-on-error: true # The workflow continues even if linting finds issues
 
-      # Step 3: Generate the SonarQube project properties
+      # Apply Coding Best Practices for Open Source Software
+      - name: Coding Best Practices for OSS
+        uses: EOEPCA/coding-best-practices-for-oss-action@main
+        with:
+          path-to-check: '.'
+          output-file: 'reports/coding-best-practices-report.json'
+          output-format: 'generic'
+          default-anchor-file: 'backend/coding-best-practices-issues.md'
+
+      # Generate the SonarQube project properties
       - name: SonarQube Project properties
+        env:
+          # Contains the name of the branch that triggered the workflow execution
+          BRANCH_NAME: ${{ github.ref_name }}
         run: |
           echo "Generating the Sonar project properties file ..."
           echo "# Sonar Project Properties" > sonar-project.properties
@@ -47,29 +59,32 @@ jobs:
           # --- Extra reports
           echo "sonar.python.ruff.reportPaths=reports/ruff-report.json" >> sonar-project.properties
           # --- Custom reports
-          echo "#sonar.externalIssuesReportPaths=reports/reports/test-report-1.json" >> sonar-project.properties
+          echo "sonar.externalIssuesReportPaths=reports/coding-best-practices-report.json" >> sonar-project.properties
 
           cat sonar-project.properties
 
-      # Step 4: Run SonarQube Analysis (using the properties file generated above)
+      # Perform SonarQube Analysis (using the properties file generated above)
       - name: SonarQube Scan
         uses: sonarsource/sonarqube-scan-action@master
         env:
           SONAR_TOKEN: ${{ secrets.EOEPCA_SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ vars.EOEPCA_SONAR_HOST_URL }}
 
-      # Step 5: Wait for Quality Gate and Fetch Report
+      # Wait for Quality Gate and Fetch Report
       - name: Fetch SonarQube Quality Gate Result
+        shell: bash
         run: |
           # The scan action creates a metadata file we use to find the task URL
           METADATA_FILE=".scannerwork/report-task.txt"
-          TASK_URL=$(grep "ceTaskUrl=" $METADATA_FILE | cut -d'=' -f2)
+          echo "SonarQube scanner metadata file:"
+          cat $METADATA_FILE
+          TASK_URL=$(grep "ceTaskUrl=" $METADATA_FILE | cut -d'=' -f2-)
 
           echo "Waiting for SonarQube background task to finish..."
 
           # Poll the API until the task is SUCCESS or FAILED
           STATUS="PENDING"
-          while [ "$STATUS" == "PENDING" ] || [ "$STATUS" == "IN_PROGRESS" ]; do
+          while [ "$STATUS" == "" ] || [ "$STATUS" == "PENDING" ] || [ "$STATUS" == "IN_PROGRESS" ]; do
             sleep 5
             RESPONSE=$(curl -s -u ${{ secrets.EOEPCA_SONAR_TOKEN }}: "$TASK_URL")
             STATUS=$(echo $RESPONSE | jq -r '.task.status')
@@ -78,9 +93,11 @@ jobs:
 
           # Fetch the final status of the Quality Gate
           ANALYSIS_ID=$(echo $RESPONSE | jq -r '.task.analysisId')
+          echo "Analysis ID: $ANALYSIS_ID"
           GATE_URL="${{ vars.EOEPCA_SONAR_HOST_URL }}/api/qualitygates/project_status?analysisId=$ANALYSIS_ID"
+          echo "Quality Gate URL: $GATE_URL"
 
           curl -s -u ${{ secrets.EOEPCA_SONAR_TOKEN }}: "$GATE_URL" > reports/sonarqube-gate-report.json
 
-          echo "Final report saved to reports/sonarqube-gate-report.json"
-        shell: bash
+          echo "Final report saved in reports/sonarqube-gate-report.json"
+          cat reports/sonarqube-gate-report.json | jq
